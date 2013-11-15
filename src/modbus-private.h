@@ -28,7 +28,7 @@
 typedef int ssize_t;
 #endif
 #include <sys/types.h>
-#include <config.h>
+//#include <config.h>
 
 #include "modbus.h"
 
@@ -99,6 +99,8 @@ typedef struct _modbus_backend {
     int (*flush) (modbus_t *ctx);
     int (*select) (modbus_t *ctx, fd_set *rset, struct timeval *tv, int msg_length);
     void (*free) (modbus_t *ctx);
+    void (*custom_rtu_ioctl_rts) (modbus_t *ctx, int before, void *extra_data);
+    void *saved_user_extra_data;
 } modbus_backend_t;
 
 struct _modbus {
@@ -110,7 +112,7 @@ struct _modbus {
     int error_recovery;
     struct timeval response_timeout;
     struct timeval byte_timeout;
-    const modbus_backend_t *backend;
+    modbus_backend_t *backend;
     void *backend_data;
 };
 

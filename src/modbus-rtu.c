@@ -282,30 +282,22 @@ static ssize_t _modbus_rtu_send(modbus_t *ctx, const uint8_t *req, int req_lengt
     DWORD n_bytes = 0;
     return (WriteFile(ctx_rtu->w_ser.fd, req, req_length, &n_bytes, NULL)) ? n_bytes : -1;
 #else
-#if HAVE_DECL_TIOCM_RTS
-    modbus_rtu_t *ctx_rtu = ctx->backend_data;
-    if (ctx_rtu->rts != MODBUS_RTU_RTS_NONE) {
-        ssize_t size;
-
-        if (ctx->debug) {
-            fprintf(stderr, "Sending request using RTS signal\n");
-        }
-
-        _modbus_rtu_ioctl_rts(ctx->s, ctx_rtu->rts == MODBUS_RTU_RTS_UP);
-        usleep(_MODBUS_RTU_TIME_BETWEEN_RTS_SWITCH);
-
-        size = write(ctx->s, req, req_length);
-
-        usleep(ctx_rtu->onebyte_time * req_length + _MODBUS_RTU_TIME_BETWEEN_RTS_SWITCH);
-        _modbus_rtu_ioctl_rts(ctx->s, ctx_rtu->rts != MODBUS_RTU_RTS_UP);
-
-        return size;
-    } else {
-#endif
-        return write(ctx->s, req, req_length);
-#if HAVE_DECL_TIOCM_RTS
+    if (ctx->backend->custom_rtu_ioctl_rts != NULL) {
+        //_modbus_rtu_ioctl_rts(ctx->s, active_high == MODBUS_RTU_RTS_UP);
+        ctx->backend->custom_rtu_ioctl_rts(ctx, 1, ctx->backend->saved_user_extra_data);
+        //usleep(_MODBUS_RTU_TIME_BETWEEN_RTS_SWITCH);
+        usleep(10000);
     }
-#endif
+    ssize_t size = write(ctx->s, req, req_length);
+
+    if (ctx->backend->custom_rtu_ioctl_rts != NULL) {
+        usleep(10000);
+        //usleep(_MODBUS_RTU_TIME_BETWEEN_RTS_SWITCH);
+        //_modbus_rtu_ioctl_rts(ctx->s, active_high != MODBUS_RTU_RTS_UP);
+        ctx->backend->custom_rtu_ioctl_rts(ctx, 0, ctx->backend->saved_user_extra_data);
+    }
+
+    return size;
 #endif
 }
 
@@ -976,6 +968,17 @@ int modbus_rtu_get_serial_mode(modbus_t *ctx)
     }
 }
 
+int modbus_rtu_register_custom_ioctl(modbus_t *ctx, void (*custom_rtu_ioctl_rts) (modbus_t *ctx, int before, void *extra_data), void *extra_data) {
+    if (ctx->backend->backend_type == _MODBUS_BACKEND_TYPE_RTU) {
+        ctx->backend->custom_rtu_ioctl_rts = custom_rtu_ioctl_rts;
+        ctx->backend->saved_user_extra_data = extra_data;
+        return 0;
+    } else {
+        errno = EINVAL;
+        return -1;
+    }    
+}
+
 int modbus_rtu_set_rts(modbus_t *ctx, int mode)
 {
     if (ctx == NULL) {
@@ -1117,7 +1120,7 @@ static void _modbus_rtu_free(modbus_t *ctx) {
     free(ctx);
 }
 
-const modbus_backend_t _modbus_rtu_backend = {
+modbus_backend_t _modbus_rtu_backend = {
     _MODBUS_BACKEND_TYPE_RTU,
     _MODBUS_RTU_HEADER_LENGTH,
     _MODBUS_RTU_CHECKSUM_LENGTH,
@@ -1137,6 +1140,8 @@ const modbus_backend_t _modbus_rtu_backend = {
     _modbus_rtu_flush,
     _modbus_rtu_select,
     _modbus_rtu_free
+    NULL, // no custom by default
+    NULL // so no user data either
 };
 
 modbus_t* modbus_new_rtu(const char *device,

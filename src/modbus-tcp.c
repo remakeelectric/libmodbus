@@ -711,7 +711,7 @@ static void _modbus_tcp_free(modbus_t *ctx) {
     free(ctx);
 }
 
-const modbus_backend_t _modbus_tcp_backend = {
+modbus_backend_t _modbus_tcp_backend = {
     _MODBUS_BACKEND_TYPE_TCP,
     _MODBUS_TCP_HEADER_LENGTH,
     _MODBUS_TCP_CHECKSUM_LENGTH,
@@ -734,7 +734,7 @@ const modbus_backend_t _modbus_tcp_backend = {
 };
 
 
-const modbus_backend_t _modbus_tcp_pi_backend = {
+modbus_backend_t _modbus_tcp_pi_backend = {
     _MODBUS_BACKEND_TYPE_TCP,
     _MODBUS_TCP_HEADER_LENGTH,
     _MODBUS_TCP_CHECKSUM_LENGTH,
